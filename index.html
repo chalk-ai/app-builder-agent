@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App Builder Agent</title>
+<style>
+  /* Chalk marketing palette: green-1 ground, chartreuse primary, mint accents. */
+  :root { --bg:#224A41; --panel:#1C3B34; --panel2:#18332D; --line:#32645B; --ink:#EFF5F3; --muted:#B9CFC7;
+          --accent:#BBD96D; --mint:#70CD96; --err:#F8947F; --mono:ui-monospace,"SFMono-Regular",Menlo,monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; padding:28px 16px; }
+  html.embed body { padding:20px; }
+  html.embed header { display:none; }
+  header { text-align:center; margin-bottom:22px; }
+  h1 { font-size:22px; font-weight:500; margin:0 0 4px; letter-spacing:-0.3px; }
+  .sub { color:var(--muted); font-size:14px; }
+  .label { font:12px/16px var(--mono); text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  main { max-width:1180px; margin:0 auto; display:grid; gap:18px; grid-template-columns:minmax(0,5fr) minmax(0,7fr); align-items:start; }
+  @media (max-width: 860px) { main { grid-template-columns:1fr; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:4px; }
+  textarea { width:100%; min-height:96px; resize:vertical; margin-top:8px; padding:12px 14px; background:var(--panel2);
+             color:var(--ink); border:1px solid var(--line); border-radius:4px; font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  textarea:focus { outline:none; border-color:var(--mint); }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 14px; }
+  .chip { font:12px/14px var(--mono); padding:7px 12px; border-radius:20px; cursor:pointer; background:transparent; color:var(--mint); border:1px solid var(--line); }
+  .chip:hover { border-color:var(--mint); }
+  .chip.instant::after { content:" · instant"; color:var(--muted); }
+  button.go { font:13px/15px var(--mono); text-transform:uppercase; letter-spacing:.06em; width:100%; border:1px solid var(--accent);
+              border-radius:20px; padding:12px 22px; cursor:pointer; background:var(--accent); color:var(--bg); transition:background .15s,color .15s; }
+  button.go:hover:not(:disabled) { background:transparent; color:var(--accent); }
+  button.go:disabled { opacity:.5; cursor:default; }
+  .compose { padding:16px; }
+  .msg { font-size:13px; margin-top:10px; min-height:18px; color:var(--muted); }
+  .msg.err { color:var(--err); }
+  .steps { display:flex; gap:6px; padding:12px 16px; border-top:1px solid var(--line); flex-wrap:wrap; }
+  .step { font:11px/14px var(--mono); text-transform:uppercase; letter-spacing:.06em; padding:5px 9px; border-radius:20px;
+          border:1px solid var(--line); color:var(--muted); }
+  .step.running { color:var(--accent); border-color:var(--accent); }
+  .step.running::before { content:"● "; animation:pulse 1s infinite; }
+  .step.done { color:var(--mint); border-color:var(--mint); }
+  .step.done::before { content:"✓ "; }
+  @keyframes pulse { 50% { opacity:.3; } }
+  .feed { border-top:1px solid var(--line); height:420px; overflow-y:auto; padding:12px 16px; font-size:13.5px; }
+  .feed .say { margin:0 0 10px; color:var(--ink); }
+  .feed .act { font:12px/18px var(--mono); color:var(--muted); margin:0 0 8px; display:flex; gap:8px; align-items:baseline; }
+  .feed .act b { color:var(--mint); font-weight:400; white-space:nowrap; }
+  .feed .act.err b { color:var(--err); }
+  .feed .act span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .feed .shot { margin:4px 0 12px; border:1px solid var(--line); border-radius:4px; overflow:hidden; cursor:pointer; }
+  .feed .shot img { display:block; width:100%; }
+  .feed .shot div { font:11px/16px var(--mono); color:var(--muted); padding:5px 8px; text-transform:uppercase; letter-spacing:.05em; }
+  .feed .note { font:12px/18px var(--mono); color:var(--accent); margin:0 0 10px; }
+  .feed .empty { color:var(--muted); }
+  .right { overflow:hidden; }
+  .tabs { display:flex; border-bottom:1px solid var(--line); }
+  .tab { font:12px/16px var(--mono); text-transform:uppercase; letter-spacing:.06em; padding:12px 16px; cursor:pointer; color:var(--muted);
+         background:none; border:0; border-bottom:2px solid transparent; }
+  .tab.on { color:var(--accent); border-bottom-color:var(--accent); }
+  .tab:disabled { opacity:.4; cursor:default; }
+  .pane { display:none; }
+  .pane.on { display:block; }
+  .viewport { aspect-ratio:16 / 10; background:var(--panel2); display:grid; place-items:center; position:relative; overflow:hidden; }
+  .viewport img, .viewport video { width:100%; height:100%; border:0; display:block; background:#fff; object-fit:contain; }
+  /* The app renders at the QA browser's 1280x800 and is scaled to fit, so the preview shows the
+     same desktop layout the recording does. */
+  .viewport iframe { position:absolute; left:0; top:0; width:1280px; height:800px; border:0; background:#fff; transform-origin:0 0; }
+  .viewport video { background:#000; }
+  .placeholder { color:var(--muted); text-align:center; padding:24px; font-size:14px; }
+  .live-label { position:absolute; left:10px; bottom:10px; font:11px/14px var(--mono); text-transform:uppercase; letter-spacing:.06em;
+                background:rgba(28,59,52,.9); color:var(--accent); padding:6px 9px; border-radius:20px; }
+  .checks { padding:14px 16px; display:grid; gap:8px; }
+  .check { display:flex; gap:10px; font-size:14px; }
+  .check .ok { color:var(--mint); } .check .bad { color:var(--err); }
+  .check small { display:block; color:var(--muted); font-size:12.5px; }
+  .summary { padding:14px 16px 0; color:var(--muted); font-size:14px; }
+  .summary b { color:var(--ink); font-weight:500; }
+  .files { display:flex; gap:6px; padding:10px 12px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .file { font:12px/14px var(--mono); padding:6px 10px; border-radius:20px; border:1px solid var(--line); color:var(--muted); background:none; cursor:pointer; }
+  .file.on { color:var(--accent); border-color:var(--accent); }
+  pre { margin:0; padding:14px 16px; max-height:560px; overflow:auto; font:12.5px/1.55 var(--mono); color:#d7e7e0; background:var(--panel2); }
+  .meta { display:flex; justify-content:space-between; gap:12px; padding:10px 16px; border-top:1px solid var(--line);
+          font:12px/16px var(--mono); text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  .meta a { color:var(--accent); text-decoration:none; }
+</style>
+<script>
+  if (new URLSearchParams(location.search).has("embed")) document.documentElement.classList.add("embed");
+</script>
+</head>
+<body>
+  <header>
+    <h1>Describe an app. An agent builds it, then tests it in a browser.</h1>
+    <div class="sub">Claude Agent SDK in a no-egress Chalk sandbox, with a recorded Chromium for QA</div>
+  </header>
+  <main>
+    <section class="card left">
+      <div class="compose">
+        <label class="label" for="prompt">Describe your app</label>
+        <textarea id="prompt" maxlength="1200" placeholder="A reading list: add books with an author and a status (to read, reading, done), filter by status, and show how many I finished this year."></textarea>
+        <div class="chips" id="chips"></div>
+        <button class="go" id="go">Build it</button>
+        <div class="msg" id="msg"></div>
+      </div>
+      <div class="steps" id="steps"></div>
+      <div class="feed" id="feed"><p class="empty">The agent's narration, files and browser actions stream here.</p></div>
+    </section>
+    <section class="card right">
+      <div class="tabs">
+        <button class="tab on" data-pane="preview">Preview</button>
+        <button class="tab" data-pane="video" disabled>QA recording</button>
+        <button class="tab" data-pane="code" disabled>Code</button>
+      </div>
+      <div class="pane on" id="pane-preview">
+        <div class="viewport" id="preview"><div class="placeholder">Your app appears here. While the agent tests it, you see what its browser sees.</div></div>
+        <div class="meta"><span id="previewMeta">Waiting for a build</span><span id="previewLink"></span></div>
+      </div>
+      <div class="pane" id="pane-video">
+        <div class="viewport"><video id="video" controls muted playsinline loop></video></div>
+        <div class="summary" id="summary"></div>
+        <div class="checks" id="checks"></div>
+        <div class="meta"><span id="videoMeta"></span><span id="videoLink"></span></div>
+      </div>
+      <div class="pane" id="pane-code">
+        <div class="files" id="files"></div>
+        <pre id="source"></pre>
+      </div>
+    </section>
+  </main>
+<script>
+const $ = (id) => document.getElementById(id);
+const STEPS = [["sandbox", "Sandbox"], ["build", "Build"], ["qa", "Browser QA"], ["publish", "Publish"]];
+const BROWSER_VERBS = { browser_open: "open", browser_click: "click", browser_type: "type", browser_press: "press",
+  browser_scroll: "scroll", browser_screenshot: "look", browser_read: "read", finish: "finish" };
+let source = null, run = null, sayEl = null, examples = [];
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function setMsg(text, err) { $("msg").textContent = text || ""; $("msg").className = "msg" + (err ? " err" : ""); }
+function feed(html, cls) {
+  const f = $("feed");
+  f.querySelector(".empty")?.remove();
+  const stick = f.scrollHeight - f.scrollTop - f.clientHeight < 60;
+  const el = document.createElement("div");
+  if (cls) el.className = cls;
+  el.innerHTML = html;
+  f.appendChild(el);
+  if (stick) f.scrollTop = f.scrollHeight;
+  return el;
+}
+function renderSteps(status) {
+  $("steps").innerHTML = STEPS.map(([k, label]) => `<span class="step ${status[k] || ""}">${label}</span>`).join("");
+}
+function showTab(name) {
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.pane === name));
+  document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", p.id === "pane-" + name));
+}
+document.querySelectorAll(".tab").forEach((t) => (t.onclick = () => !t.disabled && showTab(t.dataset.pane)));
+
+function describeTool(name, input) {
+  const short = name.replace(/^mcp__browser__/, "");
+  if (short === "Write" || short === "Edit") return [short === "Write" ? "write" : "edit", (input.file_path || "").split("/").pop()];
+  if (short === "Read" || short === "Glob" || short === "Grep") return [short.toLowerCase(), input.file_path || input.pattern || ""];
+  if (BROWSER_VERBS[short]) {
+    const target = input.selector || input.text || input.path || input.key || input.label || (input.dy != null ? `${input.dy}px` : "");
+    const value = input.value != null ? ` ← "${input.value}"` : "";
+    return [BROWSER_VERBS[short], `${target}${value}`];
+  }
+  return [short, JSON.stringify(input).slice(0, 80)];
+}
+
+function reset() {
+  $("feed").innerHTML = "";
+  sayEl = null;
+  renderSteps({});
+  $("preview").innerHTML = '<div class="placeholder">Starting a sandbox…</div>';
+  $("previewMeta").textContent = "Building";
+  $("previewLink").innerHTML = "";
+  ["video", "code"].forEach((p) => (document.querySelector(`.tab[data-pane=${p}]`).disabled = true));
+  showTab("preview");
+}
+
+function fitPreview() {
+  const frame = $("preview").querySelector("iframe");
+  if (frame) frame.style.transform = `scale(${$("preview").clientWidth / 1280})`;
+}
+new ResizeObserver(fitPreview).observe($("preview"));
+
+function showLive(ev) {
+  $("preview").innerHTML = `<img alt="What the agent's browser sees" src="data:image/jpeg;base64,${ev.jpeg_b64}"><span class="live-label">Agent's browser · ${esc(ev.label || "")}</span>`;
+}
+
+function finishRun(ev) {
+  run = ev.run;
+  const base = `runs/${run}`;
+  $("preview").innerHTML = `<iframe title="Built app" sandbox="allow-scripts allow-forms allow-modals" src="${base}/app/"></iframe>`;
+  fitPreview();
+  const name = ev.report?.app_name || "Your app";
+  $("previewMeta").textContent = `${name} · ${ev.files.length} files`;
+  $("previewLink").innerHTML = `<a href="${base}/app/" target="_blank" rel="noopener">Open in new tab</a>`;
+  if (ev.has_video) {
+    const v = $("video");
+    v.src = `${base}/qa.mp4`;
+    v.play().catch(() => {});
+    document.querySelector(".tab[data-pane=video]").disabled = false;
+    const secs = ev.video ? `${ev.video.seconds}s of ${ev.video.actions} browser actions, idle time cut` : "";
+    $("videoMeta").textContent = secs;
+    $("videoLink").innerHTML = `<a href="${base}/qa.mp4" download="qa.mp4">Download</a>`;
+  }
+  const r = ev.report;
+  $("summary").innerHTML = r ? `<b>${esc(r.app_name)}.</b> ${esc(r.summary)}` : "";
+  $("checks").innerHTML = (r?.checks || []).map((c) =>
+    `<div class="check"><span class="${c.passed ? "ok" : "bad"}">${c.passed ? "✓" : "✗"}</span><div>${esc(c.name)}${c.notes ? `<small>${esc(c.notes)}</small>` : ""}</div></div>`
+  ).join("") + (r?.fixed?.length ? `<div class="check"><span class="ok">↻</span><div>Fixed during QA<small>${r.fixed.map(esc).join("<br>")}</small></div></div>` : "");
+  $("files").innerHTML = ev.files.map((f, i) => `<button class="file${i ? "" : " on"}" data-path="${esc(f.path)}">${esc(f.path)}</button>`).join("");
+  $("files").querySelectorAll(".file").forEach((b) => (b.onclick = () => loadSource(b)));
+  document.querySelector(".tab[data-pane=code]").disabled = false;
+  const first = $("files").querySelector(".file");
+  if (first) loadSource(first);
+}
+
+async function loadSource(btn) {
+  $("files").querySelectorAll(".file").forEach((b) => b.classList.toggle("on", b === btn));
+  const r = await fetch(`runs/${run}/source/${encodeURIComponent(btn.dataset.path).replace(/%2F/g, "/")}`);
+  $("source").textContent = r.ok ? await r.text() : "Could not load this file.";
+}
+
+function onEvent(ev, status) {
+  switch (ev.t) {
+    case "hello":
+      if (ev.replay) setMsg("Replaying a recorded build of this app.");
+      break;
+    case "step":
+      status[ev.step] = ev.status;
+      renderSteps(status);
+      if (ev.step === "qa" && ev.status === "running") feed("Switching to browser QA. Everything below is recorded.", "note");
+      break;
+    case "sandbox":
+      feed(`<b>sandbox</b><span>gVisor · egress only to ${esc(ev.egress_allowlist.join(", "))} · ${esc(ev.probe)}</span>`, "act");
+      $("preview").innerHTML = '<div class="placeholder">The agent is writing your app…</div>';
+      break;
+    case "text":
+      if (!sayEl) sayEl = feed("", "say");
+      sayEl.textContent += ev.text;
+      $("feed").scrollTop = $("feed").scrollHeight;
+      break;
+    case "text_end":
+      sayEl = null;
+      break;
+    case "tool_use": {
+      sayEl = null;
+      // Writes and edits are reported once they land, as "saved".
+      if (ev.name === "Write" || ev.name === "Edit") break;
+      const [verb, what] = describeTool(ev.name, ev.input || {});
+      feed(`<b>${esc(verb)}</b><span>${esc(what)}</span>`, "act");
+      break;
+    }
+    case "tool_result":
+      if (ev.is_error) feed(`<b>retry</b><span>${esc(ev.preview)}</span>`, "act err");
+      break;
+    case "file":
+      feed(`<b>saved</b><span>${esc(ev.path)} · ${(ev.bytes / 1024).toFixed(1)} KB</span>`, "act");
+      break;
+    case "screenshot": {
+      showLive(ev);
+      const el = feed(`<img alt="" src="data:image/jpeg;base64,${ev.jpeg_b64}"><div>${esc(ev.label || "")}</div>`, "shot");
+      el.onclick = () => { showTab("preview"); showLive(ev); };
+      break;
+    }
+    case "qa": {
+      const r = ev.report, passed = (r.checks || []).filter((c) => c.passed).length;
+      feed(`QA: ${passed}/${(r.checks || []).length} checks passed.`, "note");
+      break;
+    }
+    case "result":
+      feed(`<b>done</b><span>${ev.turns} turns · ${(ev.duration_ms / 1000).toFixed(0)}s${ev.cost_usd ? ` · $${ev.cost_usd.toFixed(2)}` : ""}</span>`, "act");
+      break;
+    case "outputs":
+      finishRun(ev);
+      showTab(ev.has_video ? "video" : "preview");
+      break;
+    case "error":
+      setMsg(ev.message, true);
+      feed(`<b>error</b><span>${esc(ev.message)}</span>`, "act err");
+      break;
+  }
+}
+
+async function start(prompt) {
+  if (source) source.close();
+  setMsg("");
+  $("go").disabled = true;
+  try {
+    const r = await fetch("api/builds", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt }) });
+    const j = await r.json();
+    if (!r.ok) { setMsg(j.error || "Could not start a build.", true); $("go").disabled = false; return; }
+    reset();
+    const status = {};
+    source = new EventSource(`api/builds/${j.id}/events`);
+    source.onmessage = (m) => {
+      const ev = JSON.parse(m.data);
+      if (ev.t === "end") { source.close(); source = null; $("go").disabled = false; return; }
+      onEvent(ev, status);
+    };
+    source.onerror = () => { if (source) { source.close(); source = null; } $("go").disabled = false; };
+  } catch (e) {
+    setMsg("Could not reach the demo server.", true);
+    $("go").disabled = false;
+  }
+}
+
+$("go").onclick = () => start($("prompt").value.trim() || $("prompt").placeholder);
+
+(async () => {
+  renderSteps({});
+  try { examples = await (await fetch("api/examples")).json(); } catch (e) { examples = []; }
+  for (const ex of examples) {
+    const b = document.createElement("button");
+    b.className = "chip instant"; b.type = "button"; b.textContent = ex.label; b.title = ex.prompt;
+    b.onclick = () => { $("prompt").value = ex.prompt; start(ex.prompt); };
+    $("chips").appendChild(b);
+  }
+})();
+
+// When embedded, tell the host page how tall the content is so it can size the iframe.
+if (document.documentElement.classList.contains("embed") && window.parent !== window) {
+  const report = () => window.parent.postMessage(
+    { type: "chalk-demo-height", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*");
+  new ResizeObserver(report).observe(document.body);
+  report();
+}
+</script>
+</body>
+</html>
