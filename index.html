@@ -25,7 +25,7 @@
   .chips { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 14px; }
   .chip { font:12px/14px var(--mono); padding:7px 12px; border-radius:20px; cursor:pointer; background:transparent; color:var(--mint); border:1px solid var(--line); }
   .chip:hover { border-color:var(--mint); }
-  .chip.instant::after { content:" · instant"; color:var(--muted); }
+  .chip.instant::after { content:" · recorded"; color:var(--muted); }
   button.go { font:13px/15px var(--mono); text-transform:uppercase; letter-spacing:.06em; width:100%; border:1px solid var(--accent);
               border-radius:20px; padding:12px 22px; cursor:pointer; background:var(--accent); color:var(--bg); transition:background .15s,color .15s; }
   button.go:hover:not(:disabled) { background:transparent; color:var(--accent); }
@@ -89,8 +89,8 @@
 </head>
 <body>
   <header>
-    <h1>Describe an app. An agent builds it, then tests it in a browser.</h1>
-    <div class="sub">Claude Agent SDK in a no-egress Chalk sandbox, with a recorded Chromium for QA</div>
+    <h1>App builder agent</h1>
+    <div class="sub">Describe a small web app. Try the result, read its source, and watch the agent test it in a browser.</div>
   </header>
   <main>
     <section class="card left">
@@ -102,7 +102,7 @@
         <div class="msg" id="msg"></div>
       </div>
       <div class="steps" id="steps"></div>
-      <div class="feed" id="feed"><p class="empty">The agent's narration, files and browser actions stream here.</p></div>
+      <div class="feed" id="feed"><p class="empty">Agent updates, file changes, and browser checks appear here.</p></div>
     </section>
     <section class="card right">
       <div class="tabs">
@@ -111,7 +111,7 @@
         <button class="tab" data-pane="code" disabled>Code</button>
       </div>
       <div class="pane on" id="pane-preview">
-        <div class="viewport" id="preview"><div class="placeholder">Your app appears here. While the agent tests it, you see what its browser sees.</div></div>
+        <div class="viewport" id="preview"><div class="placeholder">Try your app here when it is ready. During testing, this panel shows the agent’s browser.</div></div>
         <div class="meta"><span id="previewMeta">Waiting for a build</span><span id="previewLink"></span></div>
       </div>
       <div class="pane" id="pane-video">
