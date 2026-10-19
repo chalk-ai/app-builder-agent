@@ -2,7 +2,7 @@
 #
 # /// script
 # requires-python = ">=3.12,<3.14"
-# dependencies = ["chalkcompute==2.13.5"]
+# dependencies = ["chalkcompute>=2.13.8"]
 # ///
 """Deploy the app builder demo (server.py + pipeline.py + index.html) as a Chalk ScalingGroup.
 
@@ -14,17 +14,13 @@ Requirements on the target environment:
   - the Chalk router is enabled (`chalk router status`)
   - a secret holds a router API key (`chalk router api-key create`), CHALK_ROUTER_API_KEY by default
 
-Credentials for the deploy itself come from `chalk config` in the current directory (or the
+Credentials for the deploy itself come from your existing `chalk login` (or the
 CHALK_* env vars):
-    ./deploy.py [--env-id <environment>] [--name app-builder-agent]
+    ./deploy.py
 """
 
 from __future__ import annotations
 
-import argparse
-import json
-import os
-import subprocess
 import time
 from pathlib import Path
 
@@ -32,34 +28,11 @@ HERE = Path(__file__).resolve().parent
 APP_FILES = ["server.py", "pipeline.py", "builder_agent.py", "index.html"]
 
 
-def load_chalk_env(env_id: str | None) -> None:
-    if "CHALK_CLIENT_ID" not in os.environ:
-        cfg = json.loads(subprocess.check_output(["chalk", "config", "--json"]))
-        os.environ["CHALK_API_SERVER"] = cfg["apiServer"]["value"]
-        os.environ["CHALK_CLIENT_ID"] = cfg["clientId"]["value"]
-        os.environ["CHALK_CLIENT_SECRET"] = cfg["clientSecret"]["value"]
-        os.environ.setdefault("CHALK_ENVIRONMENT_ID", cfg["environment"]["value"])
-    if env_id:
-        os.environ["CHALK_ENVIRONMENT_ID"] = env_id
-
-
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--name", default="app-builder-agent")
-    # Defaults to the environment in `chalk config` (or CHALK_ENVIRONMENT_ID).
-    parser.add_argument("--env-id", default=None)
-    parser.add_argument("--model", default="anthropic/claude-sonnet-5-5")
-    parser.add_argument("--key-secret", default="CHALK_ROUTER_API_KEY")
-    parser.add_argument("--max-concurrent", default="2")
-    parser.add_argument("--max-per-hour", default="12")
-    parser.add_argument("--ready-timeout", type=float, default=900.0)
-    args = parser.parse_args()
-
-    load_chalk_env(args.env_id)
     from chalkcompute import Image, ScalingGroup
 
     image = Image.debian_slim(python_version="3.12").pip_install(
-        ["chalkcompute==2.13.5", "fastapi==0.116.1", "uvicorn[standard]==0.35.0"]
+        ["chalkcompute>=2.13.8", "fastapi==0.116.1", "uvicorn[standard]==0.35.0"]
     )
     # The app files total more than the 32 KiB inline `copy` budget, so they ride a volume
     # mounted at /app when the replica starts. Nothing at build time needs them.
@@ -69,18 +42,16 @@ def main() -> None:
 
     sg = ScalingGroup(
         image=image,
-        name=args.name,
+        name='app-builder-agent',
         cpu="1",
         memory="2Gi",
         env={
-            # Not secrets: which API the workload identity talks to, and where the router lives.
-            "CHALK_API_SERVER": os.environ["CHALK_API_SERVER"],
-            "CHALK_ENVIRONMENT_ID": os.environ["CHALK_ENVIRONMENT_ID"],
+
             "PORT": "8080",
-            "BUILD_MODEL": args.model,
-            "BUILD_KEY_SECRET": args.key_secret,
-            "BUILD_MAX_CONCURRENT": args.max_concurrent,
-            "BUILD_MAX_PER_HOUR": args.max_per_hour,
+            "BUILD_MODEL": 'anthropic/claude-sonnet-5-5',
+            "BUILD_KEY_SECRET": 'CHALK_ROUTER_API_KEY',
+            "BUILD_MAX_CONCURRENT": '2',
+            "BUILD_MAX_PER_HOUR": '12',
         },
         entrypoint=["python", "/app/server.py"],
         port=8080,
@@ -92,7 +63,7 @@ def main() -> None:
     )
     t0 = time.monotonic()
     try:
-        sg.deploy(build_timeout=1200.0, ready_timeout=args.ready_timeout)
+        sg.deploy(build_timeout=1200.0, ready_timeout=900.0)
     finally:
         print(f"deploy returned after {time.monotonic() - t0:.0f}s")
     print("web_url:", sg.web_url)
