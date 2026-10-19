@@ -75,7 +75,7 @@ def router_config() -> RouterConfig:
     api = os.environ["CHALK_API_SERVER"].rstrip("/")
     return RouterConfig(
         base_url=os.environ.get("BUILD_ROUTER_BASE_URL", f"{api}/v1/router"),
-        environment_id=os.environ["CHALK_ENVIRONMENT_ID"],
+        environment_id=os.environ["CHALK_ENVIRONMENT"],
         key_secret=os.environ.get("BUILD_KEY_SECRET", "CHALK_ROUTER_API_KEY"),
         model=os.environ.get("BUILD_MODEL", "anthropic/claude-sonnet-5-5"),
     )

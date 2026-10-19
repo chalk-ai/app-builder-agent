@@ -2,7 +2,7 @@
 #
 # /// script
 # requires-python = ">=3.12,<3.14"
-# dependencies = ["chalkcompute==2.13.5"]
+# dependencies = ["chalkcompute>=2.13.8"]
 # ///
 """Deploy the app builder demo (server.py + pipeline.py + index.html) as a Chalk ScalingGroup.
 
@@ -21,7 +21,6 @@ CHALK_* env vars):
 
 from __future__ import annotations
 
-import os
 import time
 from pathlib import Path
 
@@ -29,26 +28,11 @@ HERE = Path(__file__).resolve().parent
 APP_FILES = ["server.py", "pipeline.py", "builder_agent.py", "index.html"]
 
 
-def configure_chalk() -> None:
-    """Resolve deployment routing settings using the SDK's ambient login."""
-    from chalkcompute import ConnectClient
-
-    client = ConnectClient()
-    try:
-        client._ensure_auth()
-        # Only routing settings are needed by the deployed app; credentials stay in the SDK.
-        os.environ["CHALK_API_SERVER"] = client._api_server
-        os.environ["CHALK_ENVIRONMENT_ID"] = client._env_id
-    finally:
-        client.close()
-
-
 def main() -> None:
-    configure_chalk()
     from chalkcompute import Image, ScalingGroup
 
     image = Image.debian_slim(python_version="3.12").pip_install(
-        ["chalkcompute==2.13.5", "fastapi==0.116.1", "uvicorn[standard]==0.35.0"]
+        ["chalkcompute>=2.13.8", "fastapi==0.116.1", "uvicorn[standard]==0.35.0"]
     )
     # The app files total more than the 32 KiB inline `copy` budget, so they ride a volume
     # mounted at /app when the replica starts. Nothing at build time needs them.
@@ -62,9 +46,7 @@ def main() -> None:
         cpu="1",
         memory="2Gi",
         env={
-            # Not secrets: which API the workload identity talks to, and where the router lives.
-            "CHALK_API_SERVER": os.environ["CHALK_API_SERVER"],
-            "CHALK_ENVIRONMENT_ID": os.environ["CHALK_ENVIRONMENT_ID"],
+
             "PORT": "8080",
             "BUILD_MODEL": 'anthropic/claude-sonnet-5-5',
             "BUILD_KEY_SECRET": 'CHALK_ROUTER_API_KEY',
